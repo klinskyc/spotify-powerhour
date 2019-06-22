@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Spotify Web Playback SDK Quick Start Tutorial</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.min.css">
+</head>
+<body>
+  <h1>It's power hour time</h1>
+  <div id="onceConnected" style="display:none;">
+    <h2>Time Remaining: <span id="demo">60m 0s</span></h2>
+    <h2>Number of Shots: <span id="shotNumber">0</span></h2>
+    <h2>Number of Ozs: <span id="ozNumber">0</span></h2>
+    <h2>Number of 12 oz Beers: <span id="beerNumber">0</span></h2>
+    <h2> Currently Playing: <span id="currentlyPlaying"> </span></h2>
+    <img id="albumArt" src="" />
+    <div id="beforeStart">
+      <ol>
+        <li> In your Spotify app, connect to PowerHour Time as a device </li>
+        <li> In your Spotify app, choose a song, and press play </li>
+      </ol>
+    </div>
+  </div>
+  <div id="beforeConnected">
+    <form action="https://accounts.spotify.com/en/authorize" class="no-padding" id="get-access-token">
+      <input type="hidden" name="response_type" value="token">
+      <input type="hidden" name="client_id" value="5c5fee1054b842c6b699d4c3977494c1">
+      <input type="hidden" name="redirect_uri" data-generate-redirect-uri="true" value="http://localhost:4567/">
+      <input type="hidden" name="scope" value="streaming user-read-birthdate user-read-email user-modify-playback-state user-read-private">
+      <input type="hidden" name="show_dialog" value="true">
+
+      <button type="submit" class="btn btn-primary btn-sm">Connect Power Hour to Spotify</button>
+    </form>
+  </div>
+  <h5>  <a target="_blank" href="https://twitter.com/klinskyc"> Made by Cavan Klinsky </a> </h5>
+  <script src="https://sdk.scdn.co/spotify-player.js"></script>
+  <script>
+
+    function getHashParams() {
+
+      var hashParams = {};
+      var e,
+          a = /\+/g,  // Regex for replacing addition symbol with a space
+          r = /([^&;=]+)=?([^&;]*)/g,
+          d = function (s) { return decodeURIComponent(s.replace(a, " ")); },
+          q = window.location.hash.substring(1);
+
+      while (e = r.exec(q))
+         hashParams[d(e[1])] = d(e[2]);
+
+      return hashParams;
+    }
+
+    window.onSpotifyWebPlaybackSDKReady = () => {
+      const token = getHashParams(window.location.hash).access_token
+      if (token) {
+        document.getElementById('onceConnected').style.display = "block";
+        document.getElementById('beforeConnected').style.display = "none";
+      }
+      const player = new Spotify.Player({
+        name: 'PowerHour Time',
+        getOAuthToken: cb => { cb(token); }
+      });
+      let shotNumber = 0;
+      let ozNumber = 0;
+      let beerNumber = 0;
+      let hasStarted = false;
+      let isPaused = true;
+      // Error handling
+      player.addListener('initialization_error', ({ message }) => { console.error(message); });
+      player.addListener('authentication_error', ({ message }) => { console.error(message); });
+      player.addListener('account_error', ({ message }) => { console.error(message); });
+      player.addListener('playback_error', ({ message }) => { console.error(message); });
+
+      // Playback status updates
+      player.addListener('player_state_changed', state => { 
+
+            player.getCurrentState().then(state => {
+                    if (!state) {
+                      console.error('User is not playing music through the Web Playback SDK');
+                      return;
+                    }
+
+                    let {
+                      current_track,
+                      next_tracks: [next_track],
+                      paused
+                    } = state.track_window;
+
+                    isPaused = paused;
+                    console.log(state);
+                    const songInfo = current_track.name + " - " + current_track.artists[0].name
+                    document.getElementById('currentlyPlaying').innerHTML = songInfo;   
+                    document.getElementById('albumArt').src = current_track.album.images[0].url;    
+
+                  }); 
+          if (!hasStarted) {
+          setInterval(function(){ 
+            if (!isPaused) {
+            player.nextTrack().then(() => {
+              player.seek((Math.random() * 90) * 1000).then(() => {
+                shotNumber = shotNumber + 1;
+                ozNumber = shotNumber * 1.5;
+                beerNumber = ozNumber / 12.0;
+                document.getElementById('shotNumber').innerHTML = shotNumber;
+                document.getElementById('ozNumber').innerHTML = ozNumber;
+                document.getElementById('beerNumber').innerHTML = beerNumber;
+              });
+            });
+          }
+        }, 60000);
+            console.log('Started!');
+            var countDownDate = new Date().getTime() + (60*60*1000);
+
+// Update the count down every 1 second
+var x = setInterval(function() {
+
+  // Get today's date and time
+  var now = new Date().getTime();
+    
+  // Find the distance between now and the count down date
+  var distance = countDownDate - now;
+    
+  // Time calculations for days, hours, minutes and seconds
+  var days = Math.floor(distance / (1000 * 60 * 60 * 24));
+  var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+  var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+    
+  document.getElementById("demo").innerHTML = minutes + "m " + seconds + "s ";
+    
+  // If the count down is over, write some text 
+  if (distance < 0) {
+    clearInterval(x);
+    player.pause();
+    document.getElementById("demo").innerHTML = "Power Hour Over";
+  }
+}, 1000);
+            hasStarted = true;
+            document.getElementById('beforeStart').style.display = "none";
+            }
+          });
+
+
+      // Ready
+      player.addListener('ready', ({ device_id }) => {
+        player.resume().then(() => {
+          console.log('Resumed!');
+        });
+      });
+
+      // Not Ready
+      player.addListener('not_ready', ({ device_id }) => {
+        console.log('Device ID has gone offline', device_id);
+      });
+
+      // Connect to the player!
+      player.connect();
+    };
+  </script>
+</body>
+</html>
